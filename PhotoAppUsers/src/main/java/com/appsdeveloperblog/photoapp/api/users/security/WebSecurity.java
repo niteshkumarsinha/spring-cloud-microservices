@@ -1,41 +1,38 @@
 package com.appsdeveloperblog.photoapp.api.users.security;
 
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
 @Configuration
 @EnableWebSecurity
 public class WebSecurity {
-	
+
+	private final Environment env;
+
+	public WebSecurity(Environment env) {
+		this.env = env;
+	}
+
 	@Bean
-	protected SecurityFilterChain configure(HttpSecurity http) throws Exception {
-		http.csrf((csrf) -> csrf.disable());
-		http.authorizeHttpRequests((authz) -> authz
-				.requestMatchers("/users").permitAll()
-				.requestMatchers("/h2-console/**").permitAll().anyRequest().authenticated());
-		http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
-		http.headers((headers) -> headers.frameOptions((frameOptions) -> frameOptions.sameOrigin()));
-		
+
+	public SecurityFilterChain configure(HttpSecurity http) throws Exception {
+		String gatewayIp = env.getProperty("gateway.ip");
+		http
+			.csrf(csrf -> csrf.disable())
+			.authorizeHttpRequests(authz -> authz
+					.requestMatchers("/users").access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
+					.requestMatchers("/h2-console/**").permitAll()
+					.anyRequest().authenticated()
+			)
+			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
+
 		return http.build();
 	}
-	
-	@Bean
-    public WebSecurityCustomizer webSecurityCustomizer(){
-        return (web -> web.ignoring().requestMatchers(
-                "/v2/api-docs",
-                "/configuration/ui",
-                "/swagger-resources/**",
-                "/configuration/security",
-                "/swagger-ui.html",
-                "/webjars/**"
-                //"/h2-console/**"
-        ));
-    }
 }
