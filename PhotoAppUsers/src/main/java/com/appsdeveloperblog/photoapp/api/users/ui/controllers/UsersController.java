@@ -1,6 +1,6 @@
 package com.appsdeveloperblog.photoapp.api.users.ui.controllers;
 
-import com.appsdeveloperblog.photoapp.api.users.service.UserService;
+import com.appsdeveloperblog.photoapp.api.users.service.UsersService;
 import com.appsdeveloperblog.photoapp.api.users.service.UserServiceImpl;
 import com.appsdeveloperblog.photoapp.api.users.shared.UserDto;
 
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.appsdeveloperblog.photoapp.api.users.ui.model.CreateUserRequestModel;
 import com.appsdeveloperblog.photoapp.api.users.ui.model.CreateUserResponseModel;
+import com.appsdeveloperblog.photoapp.api.users.ui.model.LoginRequestModel;
 
 import jakarta.validation.Valid;
 
@@ -26,11 +27,11 @@ import jakarta.validation.Valid;
 @RequestMapping("/users")
 public class UsersController {
 	
-	private final UserService userService;
+	private final UsersService userService;
 	@Autowired
 	private Environment env;
 
-	UsersController(UserService userService) {
+	UsersController(UsersService userService) {
 		this.userService = userService;
 	}
 	
@@ -48,5 +49,6 @@ public class UsersController {
 		CreateUserResponseModel returnValue = modelMapper.map(createdUser, CreateUserResponseModel.class);
 		return ResponseEntity.status(HttpStatus.CREATED).body(returnValue);
 	}
+	
 }
 
