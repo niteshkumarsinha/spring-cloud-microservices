@@ -45,6 +45,7 @@ public class WebSecurity {
 			.authorizeHttpRequests(authz -> authz
 					.requestMatchers(HttpMethod.POST, "/users").access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
 					.requestMatchers("/h2-console/**").permitAll()
+					.requestMatchers(HttpMethod.GET, "/users/status/check").access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
 			)
 			.addFilter(authenticationFilter)
 			.authenticationManager(authenticationManager)
