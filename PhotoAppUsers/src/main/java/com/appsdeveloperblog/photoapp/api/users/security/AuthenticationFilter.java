@@ -27,54 +27,72 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-//Default login route
 public class AuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
-	private final UsersService usersService;
-	private final Environment environment;
+    private final AuthenticationManager authenticationManager;
+    private final UsersService usersService;
+    private final Environment environment;
 
-	public AuthenticationFilter(AuthenticationManager authenticationManager, UsersService usersService,
-			Environment environment) {
+    public AuthenticationFilter(AuthenticationManager authenticationManager,
+                                UsersService usersService,
+                                Environment environment) {
 
-		super(authenticationManager);
-		this.usersService = usersService;
-		this.environment = environment;
-	}
+        this.authenticationManager = authenticationManager;
+        this.usersService = usersService;
+        this.environment = environment;
 
-	@Override
-	public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
-			throws AuthenticationException {
+        // Optional: set the AuthenticationManager explicitly
+        setAuthenticationManager(authenticationManager);
+    }
 
-		try {
+    @Override
+    public Authentication attemptAuthentication(HttpServletRequest request,
+                                                HttpServletResponse response)
+            throws AuthenticationException {
 
-			LoginRequestModel creds = new ObjectMapper().readValue(request.getInputStream(), LoginRequestModel.class);
+        try {
 
-			return getAuthenticationManager().authenticate(
-					new UsernamePasswordAuthenticationToken(creds.getEmail(), creds.getPassword(), new ArrayList<>()));
+            LoginRequestModel credentials =
+                    new ObjectMapper().readValue(request.getInputStream(),
+                            LoginRequestModel.class);
 
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
+            return authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            credentials.getEmail(),
+                            credentials.getPassword(),
+                            new ArrayList<>()));
 
-	@Override
-	protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain,
-			Authentication auth) throws IOException, ServletException {
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
 
-		String username = ((User) auth.getPrincipal()).getUsername();
+    @Override
+    protected void successfulAuthentication(HttpServletRequest request,
+                                            HttpServletResponse response,
+                                            FilterChain chain,
+                                            Authentication authentication)
+            throws IOException, ServletException {
 
-		UserDto userDetails = usersService.getUserDetailsByEmail(username);
+        String username = ((User) authentication.getPrincipal()).getUsername();
 
-		String tokenSecret = environment.getProperty("token.secret");
+        UserDto userDetails = usersService.getUserDetailsByEmail(username);
 
-		long expirationTime = Long.parseLong(environment.getProperty("token.expiration_time"));
+        String tokenSecret = environment.getProperty("token.secret");
+        long expirationTime = Long.parseLong(
+                environment.getProperty("token.expiration_time", "86400000"));
 
-		SecretKey key = Keys.hmacShaKeyFor(tokenSecret.getBytes(StandardCharsets.UTF_8));
+        SecretKey key = Keys.hmacShaKeyFor(
+                tokenSecret.getBytes(StandardCharsets.UTF_8));
 
-		String token = Jwts.builder().subject(userDetails.getUserId()).issuedAt(new Date())
-				.expiration(new Date(System.currentTimeMillis() + expirationTime)).signWith(key).compact();
+        String token = Jwts.builder()
+                .subject(userDetails.getUserId())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationTime))
+                .signWith(key)
+                .compact();
 
-		response.addHeader("token", token);
-		response.addHeader("userId", userDetails.getUserId());
-	}
+        response.addHeader("token", token);
+        response.addHeader("userId", userDetails.getUserId());
+    }
 }

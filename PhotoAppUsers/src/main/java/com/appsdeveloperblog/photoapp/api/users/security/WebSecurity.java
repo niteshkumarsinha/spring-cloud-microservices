@@ -21,36 +21,57 @@ public class WebSecurity {
 
 	private final Environment env;
 	private final UsersService usersService;
-	private final BCryptPasswordEncoder bCryptPasswordEncoder;
-	
-	public WebSecurity(Environment env, UsersService usersService, BCryptPasswordEncoder bCryptPasswordEncoder) {
+	private final BCryptPasswordEncoder passwordEncoder;
+
+	public WebSecurity(Environment env, UsersService usersService, BCryptPasswordEncoder passwordEncoder) {
 		this.env = env;
 		this.usersService = usersService;
-		this.bCryptPasswordEncoder = bCryptPasswordEncoder;
+		this.passwordEncoder = passwordEncoder;
 	}
 
 	@Bean
 	public SecurityFilterChain configure(HttpSecurity http) throws Exception {
+
 		String gatewayIp = env.getProperty("gateway.ip");
-		AuthenticationManagerBuilder authenticationManagerBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
-		authenticationManagerBuilder.userDetailsService(usersService)
-			.passwordEncoder(bCryptPasswordEncoder);
+		String loginUrl = env.getProperty("login.url.path");
+
+		AuthenticationManagerBuilder authenticationManagerBuilder = http
+				.getSharedObject(AuthenticationManagerBuilder.class);
+
+		authenticationManagerBuilder.userDetailsService(usersService).passwordEncoder(passwordEncoder);
+
 		AuthenticationManager authenticationManager = authenticationManagerBuilder.build();
-		
+
 		AuthenticationFilter authenticationFilter = new AuthenticationFilter(authenticationManager, usersService, env);
-		authenticationFilter.setFilterProcessesUrl(env.getProperty("login.url.path"));
-		
-		http
-			.csrf(csrf -> csrf.disable())
-			.authorizeHttpRequests(authz -> authz
-					.requestMatchers(HttpMethod.POST, "/users").access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
-					.requestMatchers("/h2-console/**").permitAll()
-					.requestMatchers(HttpMethod.GET, "/users/status/check").access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
-			)
-			.addFilter(authenticationFilter)
-			.authenticationManager(authenticationManager)
-			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()));
+
+		// Prevent "Pattern cannot be null or empty"
+		authenticationFilter.setFilterProcessesUrl(loginUrl != null ? loginUrl : "/users/login");
+
+		http.csrf(csrf -> csrf.disable())
+
+				.authorizeHttpRequests(auth -> auth
+
+						.requestMatchers("/h2-console/**").permitAll()
+
+						.requestMatchers("/actuator/**").permitAll()
+
+						.requestMatchers(HttpMethod.POST, "/users")
+							.access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
+
+						.requestMatchers(HttpMethod.GET, "/users/status/check")
+							.access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
+						.requestMatchers(HttpMethod.GET, "/users/**")
+							.access(new WebExpressionAuthorizationManager("hasIpAddress('" + gatewayIp + "')"))
+
+						.anyRequest().authenticated())
+
+				.authenticationManager(authenticationManager)
+
+				.addFilter(authenticationFilter)
+
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+				.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
 		return http.build();
 	}

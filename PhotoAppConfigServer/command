@@ -1,0 +1,7 @@
+keytool -genkeypair \
+-alias apiEncryptionKey \
+-keyalg RSA \
+-keysize 2048 \
+-validity 3650 \
+-storetype PKCS12 \
+-keystore apiEncryptionKey.p12
